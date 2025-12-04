@@ -1,0 +1,14 @@
+never
+
+you should generate this file through the window
+
+cond get("initalized") is not true
+
+createElement("Left Camera", special("photon-vision", "1182"), 145, 172)
+setElementPos("Left Camera", 638, 420)
+createElement("Right Camera", special("photon-vision", "1181"), 160, 162)
+setElementPos("Right Camera", 56, 420)
+createElement("Robot Pos", kit("OI/RobotPos"), 100, 100)
+setElementPos("Robot Pos", 425, 624)
+
+set("initalized", true)

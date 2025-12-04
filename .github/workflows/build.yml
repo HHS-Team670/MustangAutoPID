@@ -1,0 +1,20 @@
+name: Gradle Build
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu' # Use zulu distribution of JDK
+          java-version: '17'     # Specify the Java version (adjust if needed)
+
+      - name: Build with Gradle
+        run: ./gradlew build

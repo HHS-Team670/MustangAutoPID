@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Mustang Dashboard</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+
+  <body>
+    <div class="tabs">
+      <div class="tab" data-tab="main">Main</div>
+      <div class="tab active" data-tab="console">Console</div>
+      <div class="tab" data-tab="logs" id="ignore">Logs</div>
+    </div>
+
+    <div id="console" class="tab-content active">
+      <h1 class="txt-color">Console</h1>
+      <button id="pause-scroll" class="pause-btn">Pause</button>
+      <div id="console-log" class="scroll-view"></div>
+      <div class="stack-view" id="stackOverlay">
+        <div class="stack-content">
+          <div class="stack-header">
+            <h2>Stack Trace</h2>
+            <span class="stack-close" id="close-stack">✖</span>
+          </div>
+          <div id="stackLines"></div>
+        </div>
+      </div>
+    </div>
+    <div id="main" class="tab-content">
+      <h1 class="txt-color">Main</h1>
+      <div id="dashboard-content" class="dashboard-view"></div>
+      <div class="element-modal" id="elementModal">
+        <div class="element-modal-content">
+          <div class="modal-header">
+            <h2>Create Element</h2>
+            <span class="modal-close" id="closeElementModal">✖</span>
+          </div>
+          <div class="modal-body">
+            <label>
+              Element Name:
+              <input type="text" id="elementName" />
+            </label>
+            <label>
+              Key:
+              <input type="text" id="elementKey" />
+            </label>
+          </div>
+          <div class="modal-footer">
+            <button id="createElementBtn">Create</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="logs" class="tab-content">
+      <h1 class="txt-color">Logs</h1>
+    </div>
+
+    <div id="loading-overlay">
+      <div class="spinner"></div>
+      <p>Launching AdvantageScope...</p>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "name": "pita-syntax",
+  "displayName": "Pita Script Syntax Highlighting",
+  "description": "Syntax highlighting for .pita scripting files used in Advantage Kit Dashboard",
+  "version": "0.0.1",
+  "publisher": "korgiassassin",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "pita",
+        "aliases": [
+          "Pita Script",
+          "pita"
+        ],
+        "extensions": [
+          ".pita"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "pita",
+        "scopeName": "source.pita",
+        "path": "./syntaxes/pita.tmLanguage.json"
+      }
+    ]
+  }
+}

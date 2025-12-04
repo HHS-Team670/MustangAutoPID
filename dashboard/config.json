@@ -1,0 +1,13 @@
+{
+  "useFilters": true,
+  "filters": [
+    "NT: ",
+    "NT4",
+    "^(?:CommandScheduler loop overrun.*|Warning at .*?(?:IterativeRobotBase\\.printLoopOverrunMessage|Tracer\\.lambda\\$printEpochs\\$0).*|(?:[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)?\\(\\):\\s*\\d+\\.\\d+s(?:\\s+|�'.*?)?)+)$",
+    "overrun",
+    "Overrun",
+    ":\\s*\\d+(?:\\.\\d+)?s",
+    "reportJoystickUnpluggedWarning"
+  ],
+  "envType": "dev"
+}

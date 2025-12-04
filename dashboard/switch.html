@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Switch Back</title>
+    <link rel="stylesheet" href="switch.css" />
+  </head>
+  <body>
+    <button id="switchButton">Back to Mustang Dashboard</button>
+    <script>
+      const { ipcRenderer } = require("electron");
+      document.getElementById("switchButton").addEventListener("click", () => {
+        ipcRenderer.invoke("switch-to-main");
+      });
+    </script>
+  </body>
+</html>

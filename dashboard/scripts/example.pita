@@ -1,0 +1,20 @@
+never
+
+this is here to ensure this script isnt run
+end
+
+cond getElementValue(kit("OI/RobotPos")) is "L4"
+
+print("test")
+
+never
+
+this is practically a comment
+
+allways
+
+print("This has to be code")
+
+cond getElementValue(kit("OI/RobotPos")) is not "L4"
+
+print("Effectivley a else stmt")

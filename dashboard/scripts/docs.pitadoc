@@ -1,0 +1,8 @@
+kit(name) : get the full value of the key from advatange kit's real outputs
+setElementSize(name, width, height) : sets the size of the given element
+createElement(name, key, width, height) : creates a new element using the value of the key with inital size width, height
+setElementPos(name, x, y) : moves the specified element to the given x,y coordinates
+getElementValue(name) : the value of the specified element all comparisans with this value must be done as strings
+allways: will allways run code after until it hits a cond stmt
+never: will never run code after until it hits a cond stmt
+cond: will run code if the given condition is met other wise it ignores everything until the next flow stmt

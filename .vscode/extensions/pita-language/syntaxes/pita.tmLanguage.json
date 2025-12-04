@@ -1,0 +1,52 @@
+{
+  "scopeName": "source.pita",
+  "patterns": [
+    {
+      "begin": "^\\s*never\\b",
+      "beginCaptures": {
+        "0": { "name": "keyword.control.pita" }
+      },
+      "end": "^\\s*(?:allways|end|cond)\\b",
+      "endCaptures": {
+        "0": { "name": "keyword.control.pita" }
+      },
+      "name": "comment.block.never.pita",
+      "patterns": [
+        {
+          "match": ".+",
+          "name": "comment.line.never.pita"
+        }
+      ]
+    },
+
+    {
+      "match": "\\b(cond|is|not|allways|never|end|endif)\\b",
+      "name": "keyword.control.pita"
+    },
+    {
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*\\(",
+      "name": "support.function.pita"
+    },
+    {
+      "match": "\".*?\"",
+      "name": "string.quoted.double.pita"
+    },
+    {
+      "match": "\\b[0-9]+(\\.[0-9]+)?\\b",
+      "name": "constant.numeric.pita"
+    },
+    {
+      "match": "\\b(true|false)\\b",
+      "name": "constant.language.boolean.pita"
+    },
+    {
+      "begin": "//",
+      "end": "$",
+      "name": "comment.line.double-slash.pita"
+    }
+  ],
+  "repository": {},
+  "fileTypes": ["pita"],
+  "name": "Pita Script",
+  "uuid": "b9b6f0b1-fb2d-4c83-97d3-01a4a2c27359"
+}

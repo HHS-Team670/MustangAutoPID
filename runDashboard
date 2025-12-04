@@ -1,0 +1,12 @@
+#!/bin/bash
+
+cd ./dashboard
+
+folderPath=./node_modules
+
+if [ -d "$folderPath" ]; then
+    npx electron .
+else
+    npm install
+    npx electron .
+fi

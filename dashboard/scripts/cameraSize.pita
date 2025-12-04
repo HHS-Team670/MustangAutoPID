@@ -1,0 +1,11 @@
+cond get("initalized") is not true
+
+endif
+
+cond getElementValue("Robot Pos") is "L4"
+
+setElementSize("Robot Pos", 400, 500)
+
+cond getElementValue("Robot Pos") is not "L4"
+
+setElementSize("Robot Pos", 100, 100)
