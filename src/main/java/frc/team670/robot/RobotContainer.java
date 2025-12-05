@@ -12,22 +12,17 @@ import java.util.List;
 public class RobotContainer {
 
   private static List<TestMotor> motors = new ArrayList<>();
-  private List<AutoPID> tuners = new ArrayList<>();
-
-  AutoPID tuner2;
+  private List<AutoPID<?>> tuners = new ArrayList<>();
 
   public RobotContainer() {
-    AutoPID tuner = AutoPID.tuneTest(25);
-    tuner.start(250);
+    AutoPID<TestMotor> tuner = AutoPID.tuneTest(25);
+    tuner.start(80, 0.1, 0.005, 0.005, 0.005);
     tuner.onFinish(this::handleFinish);
     tuners.add(tuner);
-    tuner2 = AutoPID.tuneTest(25);
-    tuner2.start(250);
-    tuner2.onFinish(this::handleFinish);
   }
 
-  private void handleFinish(AutoPID tuner, int motorId) {
-    MustangNotifier.log(String.format("AutoTuner/MotorId%d", motorId), tuner.getTunedValues());
+  private void handleFinish(AutoPID<?> tuner) {
+    MustangNotifier.log("AutoTuner/MotorId", tuner.getTunedValues());
     System.out.println(Arrays.toString(tuner.getTunedValues()));
   }
 
@@ -40,12 +35,10 @@ public class RobotContainer {
     for (TestMotor motor : motors) {
       motor.updateSimulation();
     }
-    for (AutoPID tuner : tuners) {
-      if (tuner.isFinished()) {
-        tuner2.loop();
-        continue;
-      }
+    for (AutoPID<?> tuner : tuners) {
+
       tuner.loop();
+      // System.out.println(Arrays.toString(tuner.getTunedValues()));
     }
   }
 }

@@ -1,93 +1,278 @@
 package frc.team670.robot;
 
-import edu.wpi.first.wpilibj.Timer;
-import frc.team670.libs.motors.MustangMotor;
+import edu.wpi.first.math.filter.Debouncer;
+import frc.team670.libs.utils.QuadConsumer;
+import java.util.Arrays;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
-/** Practical PID tuner for MustangMotor based on TLK PID guide. */
-public class AutoPID {
+/**
+ * Automatically tunes a motor's PID values. based on
+ * https://tlk-energy.de/blog-en/practical-pid-tuning-guide
+ *
+ * <p>P: Wait until maxVal - startValue >~ 0.21 * (maxVal - minVal) I: Wait until settling then
+ * check Math.abs(max - setpoint) = Math.abs(min - setpoint) move in the direction of the larger
+ * error 3-5 checks before picking best one if unable to find optimal value D: When max decreases
+ * bellow the setpoint
+ */
+public class AutoPID<MotorType> {
 
-  private MustangMotor<?> motor;
+  private MotorType motor;
   private double[] tunedValues = new double[3]; // P, I, D
 
   private int stage = 0; // 0=P tuning, 1=I tuning, 2=D tuning, 3=done
   private boolean started = false;
 
   private double targetPosition;
+  private double startPosition;
 
-  private double Ku; // ultimate gain
-  private double Pu; // oscillation period
-  private double oscillationStartTime;
-  private int oscillationCount;
-  private double previousErrorSign;
+  private boolean returning = false;
 
-  private BiConsumer<AutoPID, Integer> onFinishCallback;
+  private Consumer<AutoPID<MotorType>> onFinishCallback;
   private boolean called = false;
-  private int motorId;
 
-  private AutoPID(MustangMotor<?> motor) {
+  private BiConsumer<MotorType, Double> setTarget;
+  private Function<MotorType, Double> getPosition;
+  private QuadConsumer<MotorType, Double, Double, Double> setPID;
+
+  private double pStep;
+  private double iStep;
+  private double dStep;
+
+  private AutoPID(
+      MotorType motor,
+      BiConsumer<MotorType, Double> setTarget,
+      Function<MotorType, Double> getPosition,
+      QuadConsumer<MotorType, Double, Double, Double> setPID) {
     this.motor = motor;
+    this.setTarget = setTarget;
+    this.getPosition = getPosition;
+    this.setPID = setPID;
   }
 
-  public static AutoPID tuneTest(int motorId) {
-    AutoPID tuner = new AutoPID(new TestMotor(motorId));
-    tuner.motorId = motorId;
-    return tuner;
+  private double getRotations() {
+    return getPosition.apply(motor);
   }
 
-  public void start(double initialTarget) {
-    targetPosition = initialTarget;
-    motor.setTarget(targetPosition, 0.0);
-
-    started = true;
+  private void setPID(double p, double i, double d) {
+    setPID.accept(motor, p, i, d);
   }
 
-  public void onFinish(BiConsumer<AutoPID, Integer> callback) {
+  private void setTarget(double target) {
+    setTarget.accept(motor, target);
+  }
+
+  public static AutoPID<TestMotor> tuneTest(int motorId) {
+    TestMotor motor = new TestMotor(motorId);
+    return new AutoPID<TestMotor>(
+        motor,
+        (m, s) -> m.setTarget(s, 0),
+        (m) -> m.getRotations(),
+        (m, p, i, d) -> m.setPID(p, i, d));
+  }
+
+  public void start(
+      double initialTarget, double initalP, double pStep, double iStep, double dStep) {
+    this.pStep = pStep;
+    this.iStep = iStep;
+    this.dStep = dStep;
+    this.targetPosition = initialTarget;
+    this.startPosition = getRotations();
+    this.maxVal = -9e67;
+    this.minVal = 9e67;
+    setPID(initalP, 0, 0);
+    tunedValues[0] = initalP;
+  }
+
+  public void onFinish(Consumer<AutoPID<MotorType>> callback) {
     this.onFinishCallback = callback;
   }
 
-  public void loop() {
-    if (!started || stage > 3) return;
+  private Runnable then;
 
-    double now = Timer.getFPGATimestamp();
+  private void requestNextTest() {
+    returning = true;
+    maxVal = -9e67;
+    minVal = 9e67;
+    setTarget(startPosition);
 
-    double position = motor.getRotations();
-    double error = targetPosition - position;
+    System.out.println(
+        "Returning to "
+            + startPosition
+            + " CurrentPos: "
+            + getRotations()
+            + " PID: "
+            + Arrays.toString(tunedValues));
 
-    if (stage == 0) {
-      double KpStep = 0.05; // increment P slowly
-      tunedValues[0] += KpStep;
+    then =
+        () -> {
+          setPID(tunedValues[0], tunedValues[1], tunedValues[2]);
+          setTarget(targetPosition);
+        };
+  }
 
-      motor.setPID(tunedValues[0], 0.0, 0.0);
-      motor.setTarget(targetPosition, 0.0);
+  private double maxVal = -9e67;
+  private double minVal = 9e67;
+  private double lastPosition = startPosition;
+  private Debouncer stabilityDebouncer = new Debouncer(0.6);
+  private double stabillitySlopeThreashold = 0.0001; // tune threshold
+  private double allowedIError = 0.05;
+  private boolean stable = false;
+  private double prevDelta = 0;
+  private boolean oscillating = false;
+  private int oCount = 0;
 
-      double errorSign = Math.signum(error);
-
-      if (errorSign != previousErrorSign && Math.abs(error) > 0.01) {
-        oscillationCount++;
-        if (oscillationCount == 1) {
-          oscillationStartTime = now;
-        } else if (oscillationCount == 3) {
-          Pu = (now - oscillationStartTime) / 2.0;
-          Ku = tunedValues[0];
-          stage++;
-        }
-      }
-      previousErrorSign = errorSign;
-    } else if (stage == 1) {
-      tunedValues[1] = 0.45 * Ku / Pu;
-      stage++;
-    } else if (stage == 2) {
-      tunedValues[2] = Ku * Pu / 8.0;
-      stage++;
+  private void waitTillStable(Consumer<Double> tunningCommand, Runnable unstable) {
+    double currentPos = getRotations();
+    if (currentPos > maxVal) {
+      maxVal = currentPos;
+    }
+    if (currentPos < minVal) {
+      minVal = currentPos;
     }
 
-    motor.setPID(tunedValues[0], tunedValues[1], tunedValues[2]);
-    motor.setTarget(targetPosition, 0.0);
+    double delta = currentPos - lastPosition;
+
+    // --- OSCILLATION DETECTION ---
+    boolean slopeFlip = (delta * prevDelta) < 0; // sign change
+    boolean amplitudeLarge = lastPosition - currentPos > 0.5; // amplitude threshold
+
+    if (slopeFlip && amplitudeLarge) {
+      oCount++;
+    }
+
+    if (oCount >= 4) {
+      oscillating = true;
+      oCount = 0;
+    }
+
+    prevDelta = delta;
+    lastPosition = currentPos;
+
+    if (oscillating) {
+      System.out.println("⚠ Motor oscillating, using unstable handler");
+
+      unstable.run();
+      oscillating = false;
+      stable = false;
+      stabilityDebouncer.calculate(false);
+      requestNextTest();
+
+      return;
+    }
+
+    if (stable) {
+      tunningCommand.accept(currentPos);
+      requestNextTest();
+      stable = false;
+      stabilityDebouncer.calculate(false);
+    } else {
+      stable =
+          stabilityDebouncer.calculate(
+              Math.abs(currentPos - lastPosition) < stabillitySlopeThreashold);
+      System.out.println("Waiting for stability... Current pos: " + currentPos + " Max: ");
+    }
+  }
+
+  private void tuneP(double currentPos) {
+    double travelDistance = Math.max(0, maxVal + startPosition);
+    double curveDistance = maxVal - minVal;
+    boolean withinLowerThreashold = curveDistance > 0.20 * travelDistance;
+    boolean withinUpperThreashold = curveDistance < 0.23 * travelDistance;
+    if (withinLowerThreashold && withinUpperThreashold) {
+      System.out.println("P tuning complete. New P: " + tunedValues[0]);
+      stage++;
+    } else {
+      System.out.println(
+          "Tuning P... TravelDistance: "
+              + travelDistance
+              + " CurveDistance: "
+              + curveDistance
+              + " TargetRange: ["
+              + (0.20 * travelDistance)
+              + ", "
+              + (0.23 * travelDistance)
+              + "]");
+      if (curveDistance < 0.20 * travelDistance) {
+        tunedValues[0] += pStep;
+      } else if (curveDistance > 0.23 * travelDistance) {
+        if (tunedValues[0] <= pStep) {
+          pStep = tunedValues[0] / 2;
+          tunedValues[0] += pStep;
+          return;
+        }
+        tunedValues[0] -= pStep;
+      }
+    }
+  }
+
+  private void tuneI(double currentPos) {
+    double topArea = Math.abs(maxVal - targetPosition);
+    double bottomArea = Math.abs(minVal - targetPosition);
+    if (Math.abs(topArea - bottomArea) < allowedIError) {
+      System.out.println("I tuning complete. New I: " + tunedValues[1]);
+      stage++;
+    } else if (topArea < bottomArea) {
+      tunedValues[1] += iStep;
+    } else if (topArea > bottomArea) {
+
+      tunedValues[1] -= iStep;
+    }
+  }
+
+  private void tuneD(double currentPos) {
+    if (maxVal < targetPosition) {
+      System.out.println("D tuning complete. New D: " + tunedValues[2]);
+      stage++;
+    } else {
+      tunedValues[2] += dStep;
+    }
+  }
+
+  public void loop() {
+    if (stage >= 3) return;
+
+    if (!started) {
+      setTarget(targetPosition);
+      started = true;
+    }
+
+    if (returning) {
+      if (Math.abs(getRotations() - startPosition) < 0.9) {
+        returning = false;
+
+        then.run();
+      } else {
+        // System.out.println(
+        // "Returning... Current pos: " + getRotations() + " Target: " + startPosition);
+      }
+      return;
+    }
+
+    if (stage == 0) {
+      waitTillStable(
+          this::tuneP,
+          () -> {
+            tunedValues[0] -= pStep; // decrease P if unstable
+          });
+    } else if (stage == 1) {
+      waitTillStable(
+          this::tuneI,
+          () -> {
+            tunedValues[1] -= iStep; // decrease I if unstable
+          });
+    } else if (stage == 2) {
+      waitTillStable(
+          this::tuneD,
+          () -> {
+            tunedValues[2] -= dStep; // decrease D if unstable
+          });
+    }
 
     if (stage >= 3 && !called) {
       called = true;
-      if (onFinishCallback != null) onFinishCallback.accept(this, motorId);
+      if (onFinishCallback != null) onFinishCallback.accept(this);
     }
   }
 
@@ -97,5 +282,9 @@ public class AutoPID {
 
   public double[] getTunedValues() {
     return tunedValues;
+  }
+
+  public MotorType getMotor() {
+    return motor;
   }
 }

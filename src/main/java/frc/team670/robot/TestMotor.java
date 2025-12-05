@@ -6,14 +6,14 @@ import frc.team670.libs.motors.MustangMotor;
 @SuppressWarnings("unused")
 public class TestMotor extends MustangMotor<Integer> {
 
-  private double position = 0.0; // rotations
-  private double velocity = 0.0; // rotations/sec
-  private double lastPosition = 0.0;
-  private double lastVelocity = 0.0;
-  private double p = 0.0, i = 0.0, d = 0.0;
-  private double s = 0.0, v = 0.0, a = 0.0, g = 0.0;
+  private double position = 0.0;
+  private double velocity = 0.0;
+
   private double target = 0.0;
-  private double feedforward = 0.0;
+
+  private double p = 0.0, i = 0.0, d = 0.0;
+  private double integral = 0.0;
+  private double lastError = 0.0;
 
   private long lastTime = System.nanoTime();
 
@@ -25,21 +25,56 @@ public class TestMotor extends MustangMotor<Integer> {
   @Override
   public void setTarget(double rotations, double feedforward) {
     this.target = rotations;
-    this.feedforward = feedforward;
   }
 
   @Override
-  public void setSpeed(double speed) {
-    this.velocity = speed;
+  public void setPID(double p, double i, double d) {
+    this.p = p;
+    this.i = i;
+    this.d = d;
   }
 
-  @Override
-  public void setEncoderPosition(double rotations) {
-    this.position = rotations;
-  }
+  // ---- Simple realistic constants ----
+  private static final double MAX_ACCEL = 50.0; // rot/sec²
+  private static final double MAX_VELOCITY = 80.0; // rot/sec
+  private static final double FRICTION = 0.05;
 
-  @Override
-  public void toggleIdleMode() {}
+  public void updateSimulation() {
+
+    long now = System.nanoTime();
+    double dt = (now - lastTime) / 1e9;
+    lastTime = now;
+    if (dt <= 0 || dt > 0.1) return;
+
+    // ----- PID Control -----
+    double error = target - position;
+    integral += error * dt;
+    double derivative = (error - lastError) / dt;
+    lastError = error;
+
+    double control = p * error + i * integral + d * derivative;
+
+    // Clamp the controller output to realistic physical limits
+    control = Math.max(-1.0, Math.min(1.0, control));
+
+    // ----- Simple motor physics -----
+    // convert control into acceleration
+    double accel = control * MAX_ACCEL;
+
+    // apply friction
+    if (Math.abs(velocity) > 0.01) {
+      accel -= Math.signum(velocity) * FRICTION;
+    }
+
+    // integrate acceleration → velocity
+    velocity += accel * dt;
+
+    // clamp to realistic motor speed
+    velocity = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, velocity));
+
+    // integrate position
+    position += velocity * dt;
+  }
 
   @Override
   public double getRotations() {
@@ -52,13 +87,22 @@ public class TestMotor extends MustangMotor<Integer> {
   }
 
   @Override
+  public void setSpeed(double speed) {}
+
+  @Override
+  public void setEncoderPosition(double rotations) {}
+
+  @Override
+  public void toggleIdleMode() {}
+
+  @Override
   public double getSpeed() {
-    return velocity;
+    return 0;
   }
 
   @Override
   public double getCurrent() {
-    return 0.0;
+    return 0;
   }
 
   @Override
@@ -67,45 +111,5 @@ public class TestMotor extends MustangMotor<Integer> {
   }
 
   @Override
-  public void setPID(double p, double i, double d) {
-    this.p = p;
-    this.i = i;
-    this.d = d;
-  }
-
-  @Override
-  public void setFF(double s, double v, double a, double g) {
-    this.s = s;
-    this.v = v;
-    this.a = a;
-    this.g = g;
-  }
-
-  private double lastError = 0.0;
-
-  public void updateSimulation() {
-    long now = System.nanoTime();
-    double dt = (now - lastTime) / 1e9;
-    lastTime = now;
-
-    double error = target - position;
-    double integral = error * dt;
-    double derivative = (error - lastError) / dt;
-    lastError = error;
-
-    double pidOutput = p * error + i * integral + d * derivative;
-    double ffOutput =
-        s * Math.signum(velocity) + v * velocity + a * (velocity - lastVelocity) / dt + g;
-
-    double totalOutput = pidOutput + ffOutput;
-
-    double mass = 1.0; // system inertia
-    double damping = 0.1; // friction/resistance
-    double acceleration = totalOutput / mass - damping * velocity;
-
-    velocity += acceleration * dt;
-    position += velocity * dt + 0.1;
-
-    lastVelocity = velocity;
-  }
+  public void setFF(double s, double v, double a, double g) {}
 }
